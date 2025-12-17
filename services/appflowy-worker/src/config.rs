@@ -17,16 +17,16 @@ pub struct Config {
 
 impl Config {
   pub fn from_env() -> Result<Self, Error> {
+    let worker_db_url = std::env::var("APPFLOWY_WORKER_DATABASE_URL")
+      .or_else(|_| std::env::var("DATABASE_URL"))
+      .unwrap_or_else(|_| "postgres://postgres:password@localhost:5432/postgres".to_string());
     Ok(Config {
       app_env: get_env_var("APPFLOWY_WORKER_ENVIRONMENT", "local")
         .parse()
         .context("fail to get APPFLOWY_WORKER_ENVIRONMENT")?,
       redis_url: get_env_var("APPFLOWY_WORKER_REDIS_URL", "redis://localhost:6379"),
       db_settings: DatabaseSetting {
-        pg_conn_opts: PgConnectOptions::from_str(&get_env_var(
-          "APPFLOWY_WORKER_DATABASE_URL",
-          "postgres://postgres:password@localhost:5432/postgres",
-        ))?,
+        pg_conn_opts: PgConnectOptions::from_str(&worker_db_url)?,
         require_ssl: get_env_var("APPFLOWY_WORKER_DATABASE_REQUIRE_SSL", "false")
           .parse()
           .context("fail to get APPFLOWY_WORKER_DATABASE_REQUIRE_SSL")?,

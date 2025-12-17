@@ -178,6 +178,9 @@ pub struct NotificationSetting {
 // Default values favor local development.
 pub fn get_configuration() -> Result<Config, anyhow::Error> {
   let (open_ai_config, azure_ai_config) = get_open_ai_config();
+  let appflowy_db_url = std::env::var("APPFLOWY_DATABASE_URL")
+    .or_else(|_| std::env::var("DATABASE_URL"))
+    .unwrap_or_else(|_| "postgres://postgres:password@localhost:5432/postgres".to_string());
   let config = Config {
     app_env: get_env_var("APPFLOWY_ENVIRONMENT", "local")
       .parse()
@@ -197,10 +200,7 @@ pub fn get_configuration() -> Result<Config, anyhow::Error> {
         .context("fail to get APPFLOWY_ACCESS_CONTROL_REALTIME")?,
     },
     db_settings: DatabaseSetting {
-      pg_conn_opts: PgConnectOptions::from_str(&get_env_var(
-        "APPFLOWY_DATABASE_URL",
-        "postgres://postgres:password@localhost:5432/postgres",
-      ))?,
+      pg_conn_opts: PgConnectOptions::from_str(&appflowy_db_url)?,
       require_ssl: get_env_var("APPFLOWY_DATABASE_REQUIRE_SSL", "false")
         .parse()
         .context("fail to get APPFLOWY_DATABASE_REQUIRE_SSL")?,
