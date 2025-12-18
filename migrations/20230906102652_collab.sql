@@ -1,16 +1,52 @@
 -- collab update table.
-CREATE TABLE IF NOT EXISTS af_collab (
-    oid TEXT NOT NULL,
-    blob BYTEA NOT NULL,
-    len INTEGER,
-    partition_key INTEGER NOT NULL,
-    encrypt INTEGER DEFAULT 0,
-    owner_uid BIGINT NOT NULL,
-    deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    workspace_id UUID NOT NULL REFERENCES af_workspace(workspace_id) ON DELETE CASCADE,
-    PRIMARY KEY (oid, partition_key)
-) PARTITION BY LIST (partition_key);
+-- If af_collab exists but is not partitioned, rebuild it as a partitioned table and keep data.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_class c WHERE c.relname = 'af_collab'
+    ) THEN
+        -- Fresh create
+        CREATE TABLE af_collab (
+            oid TEXT NOT NULL,
+            blob BYTEA NOT NULL,
+            len INTEGER,
+            partition_key INTEGER NOT NULL,
+            encrypt INTEGER DEFAULT 0,
+            owner_uid BIGINT NOT NULL,
+            deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            workspace_id UUID NOT NULL REFERENCES af_workspace(workspace_id) ON DELETE CASCADE,
+            PRIMARY KEY (oid, partition_key)
+        ) PARTITION BY LIST (partition_key);
+    ELSIF NOT EXISTS (
+        SELECT 1
+        FROM pg_partitioned_table pt
+        JOIN pg_class c ON c.oid = pt.partrelid
+        WHERE c.relname = 'af_collab'
+    ) THEN
+        -- Exists but is not partitioned: recreate as partitioned and copy data.
+        ALTER TABLE af_collab RENAME TO af_collab_legacy;
+        CREATE TABLE af_collab (
+            oid TEXT NOT NULL,
+            blob BYTEA NOT NULL,
+            len INTEGER,
+            partition_key INTEGER NOT NULL,
+            encrypt INTEGER DEFAULT 0,
+            owner_uid BIGINT NOT NULL,
+            deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            workspace_id UUID NOT NULL REFERENCES af_workspace(workspace_id) ON DELETE CASCADE,
+            PRIMARY KEY (oid, partition_key)
+        ) PARTITION BY LIST (partition_key);
+
+        INSERT INTO af_collab (oid, blob, len, partition_key, encrypt, owner_uid, deleted_at, created_at, workspace_id)
+        SELECT oid, blob, len, partition_key, encrypt, owner_uid, deleted_at, created_at, workspace_id
+        FROM af_collab_legacy;
+
+        DROP TABLE af_collab_legacy;
+    END IF;
+END$$;
+
 CREATE TABLE IF NOT EXISTS af_collab_document PARTITION OF af_collab FOR
 VALUES IN (0);
 CREATE TABLE IF NOT EXISTS af_collab_database PARTITION OF af_collab FOR
