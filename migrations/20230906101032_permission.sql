@@ -7,8 +7,9 @@ CREATE TABLE IF NOT EXISTS af_roles (
 INSERT INTO af_roles (name)
 VALUES ('Owner'),
     ('Member'),
-    ('Guest');
-CREATE TABLE af_permissions (
+    ('Guest')
+ON CONFLICT (name) DO NOTHING;
+CREATE TABLE IF NOT EXISTS af_permissions (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) UNIQUE NOT NULL,
     access_level INTEGER NOT NULL,
@@ -31,9 +32,10 @@ VALUES ('Read only', 'Can read', 10),
         'Full access',
         'Can edit and share with others',
         50
-    );
+    )
+ON CONFLICT (name) DO NOTHING;
 -- Represents a permission that a role has. The list of all permissions a role has can be obtained by querying this table for all rows with a given role_id.
-CREATE TABLE af_role_permissions (
+CREATE TABLE IF NOT EXISTS af_role_permissions (
     role_id INT REFERENCES af_roles(id),
     permission_id INT REFERENCES af_permissions(id),
     PRIMARY KEY (role_id, permission_id)
@@ -67,4 +69,5 @@ WHERE (
     OR (
         r.name = 'Guest'
         AND p.name = 'Read only'
-    );
+    )
+ON CONFLICT DO NOTHING;
