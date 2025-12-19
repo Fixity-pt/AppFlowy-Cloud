@@ -39,9 +39,19 @@ BEGIN
             PRIMARY KEY (oid, partition_key)
         ) PARTITION BY LIST (partition_key);
 
-        INSERT INTO af_collab (oid, blob, len, partition_key, encrypt, owner_uid, deleted_at, created_at, workspace_id)
-        SELECT oid, blob, len, partition_key, encrypt, owner_uid, deleted_at, created_at, workspace_id
-        FROM af_collab_legacy;
+        -- Copy data only if legacy has the required columns; otherwise skip with a notice to avoid failure.
+        IF (
+            SELECT COUNT(*) = 8 FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'af_collab_legacy'
+              AND column_name IN ('oid','blob','len','partition_key','encrypt','owner_uid','deleted_at','created_at','workspace_id')
+        ) THEN
+            INSERT INTO af_collab (oid, blob, len, partition_key, encrypt, owner_uid, deleted_at, created_at, workspace_id)
+            SELECT oid, blob, len, partition_key, encrypt, owner_uid, deleted_at, created_at, workspace_id
+            FROM af_collab_legacy;
+        ELSE
+            RAISE NOTICE 'af_collab_legacy missing required columns; skipping data copy';
+        END IF;
 
         DROP TABLE af_collab_legacy;
     END IF;
