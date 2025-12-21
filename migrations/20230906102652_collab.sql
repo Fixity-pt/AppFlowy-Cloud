@@ -41,7 +41,7 @@ BEGIN
 
         -- Copy data only if legacy has the required columns; otherwise skip with a notice to avoid failure.
         IF (
-            SELECT COUNT(*) = 8 FROM information_schema.columns
+            SELECT COUNT(*) = 9 FROM information_schema.columns
             WHERE table_schema = 'public'
               AND table_name = 'af_collab_legacy'
               AND column_name IN ('oid','blob','len','partition_key','encrypt','owner_uid','deleted_at','created_at','workspace_id')
@@ -52,6 +52,11 @@ BEGIN
         ELSE
             RAISE NOTICE 'af_collab_legacy missing required columns; skipping data copy';
         END IF;
+
+        -- Drop any foreign keys pointing to the legacy table before dropping it.
+        PERFORM format('ALTER TABLE %s DROP CONSTRAINT %I', conrelid::regclass, conname)
+        FROM pg_constraint
+        WHERE confrelid = 'public.af_collab_legacy'::regclass;
 
         DROP TABLE af_collab_legacy;
     END IF;
